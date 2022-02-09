@@ -1,57 +1,35 @@
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.util.Properties;
 import java.io.IOException;
-import java.io.InputStream;
 import java.awt.Toolkit;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.UnsupportedFlavorException;
+import java.util.prefs.BackingStoreException;
+import java.util.prefs.Preferences;
 
+import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
 
 public class FolderMaker {
+	static Preferences prefs = Preferences.userNodeForPackage(FolderMaker.class);
+	
+	public static String getPreference(String propertyName) {
+		String result = prefs.get(propertyName, "NO DATA");
+		return result;
+	}
+	
+	public static void setPreference(String propertyName, String value) {
+		prefs.put(propertyName, value);
+		try {
+			prefs.flush();
+		} catch (BackingStoreException e) {
+			JOptionPane.showMessageDialog(null, "設定を書き込めませんでした。");
+		}
+	}
 
-	public static String readProperty(String propertyName) {	
-		String result = "";
-		try {
-			InputStream in = FolderMaker.class.getClassLoader().getResourceAsStream("config.properties");
-			Properties p=new Properties(); 
-			p.load(in);
-			result = p.getProperty(propertyName);
-		} catch (FileNotFoundException e) {
-			// is this still needed?
-			JOptionPane.showMessageDialog(null, "設定ファイルが見つかりません。");
-			e.printStackTrace();
-		} catch (IOException e) {
-			JOptionPane.showMessageDialog(null, "設定の読み込みに失敗しました。");
-			e.printStackTrace();
-		}
-	    return result;
-	}
-	
-	public static void writeProperty(String propertyName, String value) {
-		String fileName = "config.properties";
-		try {
-			InputStream in = FolderMaker.class.getClassLoader().getResourceAsStream(fileName);
-			Properties p=new Properties(); 
-			p.load(in);
-			p.setProperty(propertyName, value);
-			FileOutputStream out = new FileOutputStream("xyz.properties");
-			p.store(out , null);
-		} catch (FileNotFoundException e) {
-			JOptionPane.showMessageDialog(null, "設定ファイルが見つかりません。");
-			e.printStackTrace();
-		} catch (IOException e) {
-			JOptionPane.showMessageDialog(null, "設定の書き込みに失敗しました。");
-			e.printStackTrace();
-		}
-	}
-	
 	public static int readNextNumber() {
-		String s = readProperty("nextNumber");
-		int n = 0;
+		String s = getPreference("nextNumber");
+		int n = -1;
 		try {
 			n = Integer.parseInt(s);
 		} catch (NumberFormatException e) {
@@ -61,11 +39,11 @@ public class FolderMaker {
 	}
 	
 	public static void writeNextNumber(int n) {
-		writeProperty("nextNumber", String.valueOf(n));
+		setPreference("nextNumber", String.valueOf(n));
 	}
 	
 	public static String readParentPath() {
-		return readProperty("parentPath");
+		return getPreference("parentPath");
 	}
 		
 	public static String getClipboardText() {
@@ -82,21 +60,73 @@ public class FolderMaker {
 		}
 	}
 	
-	public static String removeBadChars(String path) {
-		return path;
+	public static String removeBadChars(String dirName) {
+		char[] badChars = { ' ', '!', '\"', '#', '$', '%', '&', '\'', '(', ')', '*', 
+							'+', ',', '.', '/', ':', ';', '<', '=', '>', '?', 
+							'[', '\\', ']', '^', '`', '{', '}', '|', '~'
+		};
+		StringBuilder sb = new StringBuilder();
+		onDirName : for (int i = 0; i < dirName.length(); i++) {
+			for (char c : badChars) {
+				if (dirName.charAt(i) == c) {
+					continue onDirName;
+				}
+			}
+			sb.append(dirName.charAt(i));
+		}
+		
+		return sb.toString();
 	}
 	
+	
+	public static void setAllPreferences(int nextNumber, String parentPath) {
+		JFileChooser chooser;
+		String s = JOptionPane.showInputDialog(null, "次の番号を入力してください", nextNumber);
+		try {
+			nextNumber = Integer.parseInt(s);
+		} catch (NumberFormatException e) {
+			JOptionPane.showMessageDialog(null, "番号が不正です");
+		}
+		
+		if (parentPath.equals("")) {
+			chooser = new JFileChooser();
+		} else {
+			chooser = new JFileChooser(parentPath);
+		}
+		chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+		int selected = chooser.showDialog(null, "親フォルダを選択");
+		if (selected == JFileChooser.APPROVE_OPTION) {
+			parentPath = chooser.getSelectedFile().toString();
+		}
+		
+		setPreference("nextNumber", String.valueOf(nextNumber));
+		setPreference("parentPath", parentPath);
+	}
+	
+	
 	public static void main(String[] args) {
+		
 		int nextNumber = readNextNumber();
-		String path = readParentPath();
+		String parentPath = readParentPath();
+		
+		if (nextNumber == -1 || parentPath.equals("NO DATA")) {
+			setAllPreferences(0, "");
+			nextNumber = readNextNumber();
+			parentPath = readParentPath();
+		} else if (args.length > 0 && args[0].equals("-config")) {
+			setAllPreferences(nextNumber, parentPath);
+			nextNumber = readNextNumber();
+			parentPath = readParentPath();
+		}
+		
 		String clipboardText = getClipboardText();
 		
-		String newDirPath = nextNumber + "_" + clipboardText;
-		newDirPath = removeBadChars(newDirPath);
+		String newDirName = nextNumber + "_" + clipboardText;
+		newDirName = removeBadChars(newDirName);
 		
-		newDirPath = JOptionPane.showInputDialog(null, "新しいフォルダー名を入力してください。", newDirPath);
-		newDirPath = removeBadChars(newDirPath);
-		File directory = new File(path, newDirPath);
+		newDirName = JOptionPane.showInputDialog(null, "新しいフォルダー名を入力してください。", newDirName);
+		newDirName = removeBadChars(newDirName);
+		File directory = new File(parentPath, newDirName);
 		if (directory.mkdirs()) {
 			JOptionPane.showMessageDialog(null, "フォルダーを作成しました。");
 			nextNumber++;
@@ -108,9 +138,17 @@ public class FolderMaker {
 }
 
 /*
-read file
-set next number as the 1st line of the file
-set parent dicrectory as the 2nd line of the file
+get nextNumber value from preferences and assign to variable nextNumber
+get parentPath value from preferences and assign to variable parentPath
+
+if nextNumber or parentPath is invalid then
+  let user modify preferences
+  get nextNumber value from preferences and assign to variable nextNumber
+  get parentPath value from preferences and assign to variable parentPath
+else if the program's first argument is -config then
+  let user modify preferences
+  get nextNumber value from preferences and assign to variable nextNumber
+  get parentPath value from preferences and assign to variable parentPath
 show input dialog
 put next number + " " + what is in the clipboard in the input box
 if user clicks OK, 
