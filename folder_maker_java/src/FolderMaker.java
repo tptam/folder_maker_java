@@ -1,6 +1,9 @@
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.util.Properties;
 import java.io.IOException;
+import java.io.InputStream;
 import java.awt.Toolkit;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.DataFlavor;
@@ -10,15 +13,59 @@ import javax.swing.JOptionPane;
 
 public class FolderMaker {
 
+	public static String readProperty(String propertyName) {	
+		String result = "";
+		try {
+			InputStream in = FolderMaker.class.getClassLoader().getResourceAsStream("config.properties");
+			Properties p=new Properties(); 
+			p.load(in);
+			result = p.getProperty(propertyName);
+		} catch (FileNotFoundException e) {
+			// is this still needed?
+			JOptionPane.showMessageDialog(null, "設定ファイルが見つかりません。");
+			e.printStackTrace();
+		} catch (IOException e) {
+			JOptionPane.showMessageDialog(null, "設定の読み込みに失敗しました。");
+			e.printStackTrace();
+		}
+	    return result;
+	}
+	
+	public static void writeProperty(String propertyName, String value) {
+		String fileName = "config.properties";
+		try {
+			InputStream in = FolderMaker.class.getClassLoader().getResourceAsStream(fileName);
+			Properties p=new Properties(); 
+			p.load(in);
+			p.setProperty(propertyName, value);
+			FileOutputStream out = new FileOutputStream("xyz.properties");
+			p.store(out , null);
+		} catch (FileNotFoundException e) {
+			JOptionPane.showMessageDialog(null, "設定ファイルが見つかりません。");
+			e.printStackTrace();
+		} catch (IOException e) {
+			JOptionPane.showMessageDialog(null, "設定の書き込みに失敗しました。");
+			e.printStackTrace();
+		}
+	}
+	
 	public static int readNextNumber() {
-		return 0;
+		String s = readProperty("nextNumber");
+		int n = 0;
+		try {
+			n = Integer.parseInt(s);
+		} catch (NumberFormatException e) {
+			JOptionPane.showMessageDialog(null, "連番が不正です。");
+		}
+		return n;
 	}
 	
 	public static void writeNextNumber(int n) {
+		writeProperty("nextNumber", String.valueOf(n));
 	}
 	
 	public static String readParentPath() {
-		return "C:\\Users\\tptam\\Documents";
+		return readProperty("parentPath");
 	}
 		
 	public static String getClipboardText() {
@@ -49,7 +96,6 @@ public class FolderMaker {
 		
 		newDirPath = JOptionPane.showInputDialog(null, "新しいフォルダー名を入力してください。", newDirPath);
 		newDirPath = removeBadChars(newDirPath);
-		
 		File directory = new File(path, newDirPath);
 		if (directory.mkdirs()) {
 			JOptionPane.showMessageDialog(null, "フォルダーを作成しました。");
@@ -76,3 +122,6 @@ if user clicks OK,
  otherwise
    show message dialog that informs failure
 */
+
+
+//https://www.javatpoint.com/properties-class-in-java
