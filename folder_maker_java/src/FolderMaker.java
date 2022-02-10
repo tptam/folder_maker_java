@@ -160,6 +160,3 @@ if user clicks OK,
  otherwise
    show message dialog that informs failure
 */
-
-
-//https://www.javatpoint.com/properties-class-in-java
